@@ -2252,6 +2252,7 @@ func (gcToolchain) gc(b *Builder, p *load.Package, archive, obj string, asmhdr b
 			}
 		}
 	}
+
 	args := []interface{}{cfg.BuildToolexec, base.Tool("compile"), "-o", ofile, "-trimpath", b.WorkDir, gcflags, gcargs, "-D", p.Internal.LocalPrefix, importArgs}
 	if ofile == archive {
 		args = append(args, "-pack")
@@ -2265,8 +2266,27 @@ func (gcToolchain) gc(b *Builder, p *load.Package, archive, obj string, asmhdr b
 		args = append(args, fmt.Sprintf("-c=%d", c))
 	}
 
-	for _, f := range gofiles {
-		args = append(args, mkAbs(p.Dir, f))
+	if len(gofiles) > 100 {
+		srclist, err := ioutil.TempFile()
+		if err != nil {
+			return ofile, nil, err
+		}
+		defer os.Remove(srclist.Name)
+
+		append(args, "-srclist")
+		append(args, srclist.Name)
+
+		for _, f := range gofiles {
+			srclist.WriteString(mkAbs(p.Dir, f))
+			srclist.Write('\n')
+		}
+
+		srclist.Close()
+	} else {
+		for _, f := range gofiles {
+			args = append(args, mkAbs(p.Dir, f))
+		}
+
 	}
 
 	output, err = b.runOut(p.Dir, p.ImportPath, nil, args...)

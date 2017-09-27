@@ -125,6 +125,8 @@ func supportsDynlink(arch *sys.Arch) bool {
 var timings Timings
 var benchfile string
 
+var srclist string
+
 // Main parses flags and Go source files specified in the command-line
 // arguments, type-checks the parsed Go package, compiles functions to machine
 // code, and finally writes the compiled package definition to disk.
@@ -233,6 +235,7 @@ func Main(archInit func(*Arch)) {
 	flag.StringVar(&blockprofile, "blockprofile", "", "write block profile to `file`")
 	flag.StringVar(&mutexprofile, "mutexprofile", "", "write mutex profile to `file`")
 	flag.StringVar(&benchfile, "bench", "", "append benchmark times to `file`")
+	flag.StringVar(&srclist, "srclist", "", "pass all files in source list to compilre")
 	objabi.Flagparse(usage)
 
 	Ctxt.Flag_shared = flag_dynlink || flag_shared
@@ -425,7 +428,21 @@ func Main(archInit func(*Arch)) {
 	loadsys()
 
 	timings.Start("fe", "parse")
-	lines := parseFiles(flag.Args())
+
+	srcs := flag.Args()
+	if srclist != "" {
+		f, err := os.Open(srclist)
+		if err != nil {
+			log.Fatalf("could not open srclist file %s\n", err)
+		}
+
+		scanner := bufio.Scanner(f)
+		for scanner.Scan() {
+			append(srcs, scanner.Text())
+		}
+	}
+
+	lines := parseFiles(srcs)
 	timings.Stop()
 	timings.AddEvent(int64(lines), "lines")
 
